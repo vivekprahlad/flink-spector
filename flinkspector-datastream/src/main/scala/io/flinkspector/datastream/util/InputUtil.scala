@@ -82,36 +82,25 @@ object InputUtil {
       timestamps.max
     }
     val array = new ArrayBuffer[Long]()
-    val seen = new ArrayBuffer[Long]()
+    val sortedTimestamps = timestamps.sortWith(_ < _)
+    var skipped, watermark = 0
+    var seen = Set[Long]()
 
-    def recur(l: List[Long]): List[Long] = {
-      if (l.isEmpty) {
-        return l
+    for(timestamp <- timestamps.take(timestamps.length - 1)) {
+      while (seen contains sortedTimestamps.get(watermark)) {
+        watermark += 1
       }
-      //TODO refactor recursion
-      val ts = l.head
-      if (l.count(ts >= _) == 1) {
-        val watermark =
-          if (l.tail.nonEmpty) {
-            val wm = Try(seen.filter(_ < l.tail.min).max)
-              .getOrElse(ts)
-            if (ts >= wm) {
-              ts
-            } else {
-              wm
-            }
-          } else {
-            max
-          }
-        array += watermark
+      if (timestamp == sortedTimestamps.get(watermark)) {
+        watermark += 1
+        array += watermark + skipped
+        skipped = 0
       } else {
         array += -1
+        skipped += { if (watermark == 0) 0 else 1 }
       }
-      seen += ts
-      recur(l.tail)
+      seen += timestamp
     }
-
-    recur(timestamps)
+    array += max
     array.toList
   }
 
